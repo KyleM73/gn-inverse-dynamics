@@ -2,14 +2,48 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
+import itertools
+import time
 import math
 
+import networkx as nx
 import numpy as np
-import sonnet as snt
+from scipy import spatial
 import tensorflow as tf
+
+from graph_nets import graphs
+from graph_nets import utils_np
+from graph_nets import utils_tf
+from graph_nets.demos_tf2 import models
 
 from model.magnetoDefinition import *
 from graphDataGeneration import *
+
+SEED = 1
+np.random.seed(SEED)
+tf.random.set_seed(SEED)
+
+###########################################################
+
+class Timer():
+  def __init__(self):
+    self._start_time = time.time() 
+
+  def reset(self):
+    self._start_time = time.time()
+
+  def elapsed(self):
+    self._elapsed_time = time.time() - self._start_time
+    return self._elapsed_time
+
+  def check(self, check_time):
+    if(self.elapsed() > check_time):
+      self.reset()
+      return True
+    else:
+      return False
+
 
 def string_to_number(str):
   if("." in str):
@@ -32,23 +66,24 @@ def string_to_list(str):
 
 def read_trajectory():
   # q, q_des, dotq, dotq_des, trq, contact_al, f_mag_al, base_ori 
-  f_q = open("magneto/data/q_sen.txt")
-  f_dq = open("magneto/data/qdot_sen.txt")
-  f_trq = open("magneto/data/trq.txt")
+  f_q = open("magneto-tf2/data/q_sen.txt")
+  f_dq = open("magneto-tf2/data/qdot_sen.txt")
+  f_trq = open("magneto-tf2/data/trq.txt")
 
-  f_base_pos = open("magneto/data/pose_base.txt")
-  f_base_ori = open("magneto/data/rot_base.txt")
+  f_base_pos = open("magneto-tf2/data/pose_base.txt")
+  f_base_ori = open("magneto-tf2/data/rot_base.txt")
 
-  f_mag_al = open("magneto/data/magnetic_AL_foot_link.txt")
-  f_mag_ar = open("magneto/data/magnetic_AR_foot_link.txt")
-  f_mag_bl = open("magneto/data/magnetic_BL_foot_link.txt")
-  f_mag_br = open("magneto/data/magnetic_BR_foot_link.txt")
+  f_mag_al = open("magneto-tf2/data/magnetic_AL_foot_link.txt")
+  f_mag_ar = open("magneto-tf2/data/magnetic_AR_foot_link.txt")
+  f_mag_bl = open("magneto-tf2/data/magnetic_BL_foot_link.txt")
+  f_mag_br = open("magneto-tf2/data/magnetic_BR_foot_link.txt")
 
   q_des = string_to_list(f_q.readline())
   dq_des = string_to_list(f_dq.readline())  
 
   traj_dicts = [] 
-  for q_line, dq_line, trq_line, bp_line, bo_line, fmal_line, fmar_line, fmbl_line, fmbr_line in zip(f_q, f_dq, f_trq, f_base_pos, f_base_ori, f_mag_al, f_mag_ar, f_mag_bl, f_mag_br) : 
+  for q_line, dq_line, trq_line, bp_line, bo_line, fmal_line, fmar_line, fmbl_line, fmbr_line \
+    in zip(f_q, f_dq, f_trq, f_base_pos, f_base_ori, f_mag_al, f_mag_ar, f_mag_bl, f_mag_br) : 
     
     q = q_des
     dq = dq_des
@@ -85,9 +120,8 @@ def read_trajectory():
 
   #print("size of traj dicts = " + str(len(traj_dicts)))
   #print(traj_dicts[-1])
-  return traj_dicts
 
-#read_trajectory()
+  return traj_dicts
 
 
 def traj_to_graph(traj_dict):
@@ -125,7 +159,7 @@ def traj_to_graph(traj_dict):
     data.append(traj_dict['q_des'][ MagnetoJoint[jointname] ])
     data.append(traj_dict['dq_des'][ MagnetoJoint[jointname] ])
     dyn_edges.append(data)
-    target_edge_tr.append(traj_dict['trq'][ MagnetoJoint[jointname] ])
+    target_edge_tr.append([traj_dict['trq'][ MagnetoJoint[jointname] ]])
 
   dynamic_graph = magneto_graph(traj_dict['base_ori'], dyn_nodes, dyn_edges)
   
@@ -149,7 +183,7 @@ def concat_graph(graph_dicts):
       global_feature.append(graph['globals'])
 
     # concatenate node
-    if(len(nodes) is 0):
+    if(len(nodes) == 0):
       nodes = graph['nodes'][:]
     else:
       nodes_temp = graph['nodes'][:]
@@ -157,7 +191,7 @@ def concat_graph(graph_dicts):
         node.extend(node_temp)
 
     # concatenate edge
-    if(len(edges) is 0):
+    if(len(edges) == 0):
       edges = graph['edges'][:]
     else:
       edges_temp = graph['edges'][:]
@@ -165,6 +199,39 @@ def concat_graph(graph_dicts):
         edge.extend(edge_temp) 
 
   return magneto_graph(global_feature, nodes, edges)
+
+##############################
+
+def generate_graphs_dicts(rand, batch_size, traj_idx_min_max, static_graph, traj_dicts):
+  
+  input_graphs_dicts = []
+  target_graphs_dicts = []
+
+  emptynode = [[0]]*len(MagnetoGraphNode)
+
+  traj_idx_start = rand.randint(*traj_idx_min_max)
+
+  for traj_idx in range(traj_idx_start, traj_idx_start + batch_size):
+
+    dynamic_graph, target_edge = traj_to_graph(traj_dicts[traj_idx])
+    input_graph = concat_graph([dynamic_graph, static_graph])
+    output_grpah = magneto_graph([], [], target_edge)
+
+    input_graphs_dicts.append(input_graph)
+    target_graphs_dicts.append(output_grpah)
+
+  return input_graphs_dicts, target_graphs_dicts
+
+def create_graph_tuples(rand, batch_size, 
+                  traj_idx_min_max, static_graph, traj_dicts):
+    input_graphs_dicts, target_graphs_dicts = generate_graphs_dicts(
+      rand, batch_size, traj_idx_min_max, static_graph, traj_dicts )
+    
+    inputs_tr = utils_tf.data_dicts_to_graphs_tuple(input_graphs_dicts)
+    outputs_tr = utils_tf.data_dicts_to_graphs_tuple(target_graphs_dicts)
+    return inputs_tr, outputs_tr
+
+##############################
 
 def create_loss_ops(target_op, output_ops):
   ''' Create supervised loss operations from targets and outputs.
@@ -176,8 +243,13 @@ def create_loss_ops(target_op, output_ops):
     A list of loss values (tf.Tensor), one per output op.
   '''
 
-  loss_ops = [tf.reduce_mean(
-              tf.reduce_sum((output_op.edges - target_op)**2, axis=-1))
-              for output_op in output_ops   ]
 
+  # loss_ops = [
+  #     tf.losses.softmax_cross_entropy(target_op.edges, output_op.edges)
+  #     for output_op in output_ops
+  # ]
+
+  loss_ops = [tf.reduce_mean(
+              tf.reduce_sum((output_op.edges - target_op.edges)**2, axis=-1))
+              for output_op in output_ops   ]
   return loss_ops

@@ -1,0 +1,15 @@
+# Editor Setting files
+*.json
+.vscode
+
+# Compiled Python files
+*.pyc
+
+# Math tool files
+*.m~
+*_RESULTS.yaml
+octave-workspace
+
+# Folders 
+saved_model*
+
