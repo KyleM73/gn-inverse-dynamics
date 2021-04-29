@@ -5,11 +5,14 @@ from __future__ import print_function
 import collections
 import itertools
 import time
-import math
+
+import os
 
 import networkx as nx
 import numpy as np
 from scipy import spatial
+# from scipy.spatial.transform import Rotation as R
+
 import tensorflow as tf
 
 from graph_nets import graphs
@@ -18,13 +21,20 @@ from graph_nets import utils_tf
 from graph_nets.demos_tf2 import models
 
 from model.magnetoDefinition import *
-from graphDataGeneration import *
+from model.magnetoGraphGeneration import *
+# from utils.myutils import * 
+import utils.myutils as myutils
 
 SEED = 1
 np.random.seed(SEED)
 tf.random.set_seed(SEED)
 
+CURRENT_DIR_PATH = os.path.dirname(os.path.realpath(__file__))
+
+
 ###########################################################
+
+
 
 class Timer():
   def __init__(self):
@@ -45,83 +55,10 @@ class Timer():
       return False
 
 
-def string_to_number(str):
-  if("." in str):
-    try:
-      res = float(str)
-    except:
-      res = str  
-  elif("-" in str):
-    res = int(str)
-  elif(str.isdigit()):
-    res = int(str)
-  else:
-    res = str
-  return(res)
 
-def string_to_list(str):
-  return [string_to_number(element) 
-          for element in str.split()]
+###########################################################
 
 
-def read_trajectory():
-  # q, q_des, dotq, dotq_des, trq, contact_al, f_mag_al, base_ori 
-  f_q = open("magneto-tf2/data/q_sen.txt")
-  f_dq = open("magneto-tf2/data/qdot_sen.txt")
-  f_trq = open("magneto-tf2/data/trq.txt")
-
-  f_base_pos = open("magneto-tf2/data/pose_base.txt")
-  f_base_ori = open("magneto-tf2/data/rot_base.txt")
-
-  f_mag_al = open("magneto-tf2/data/magnetic_AL_foot_link.txt")
-  f_mag_ar = open("magneto-tf2/data/magnetic_AR_foot_link.txt")
-  f_mag_bl = open("magneto-tf2/data/magnetic_BL_foot_link.txt")
-  f_mag_br = open("magneto-tf2/data/magnetic_BR_foot_link.txt")
-
-  q_des = string_to_list(f_q.readline())
-  dq_des = string_to_list(f_dq.readline())  
-
-  traj_dicts = [] 
-  for q_line, dq_line, trq_line, bp_line, bo_line, fmal_line, fmar_line, fmbl_line, fmbr_line \
-    in zip(f_q, f_dq, f_trq, f_base_pos, f_base_ori, f_mag_al, f_mag_ar, f_mag_bl, f_mag_br) : 
-    
-    q = q_des
-    dq = dq_des
-    q_des = string_to_list(q_line)  
-    dq_des = string_to_list(dq_line)  
-    trq = string_to_list(trq_line)
-    #bp = string_to_list(bp_line)  
-    bo = string_to_list(bo_line)  
-    fmal = string_to_list(fmal_line)    
-    fmar = string_to_list(fmar_line)  
-    fmbl = string_to_list(fmbl_line)  
-    fmbr = string_to_list(fmbr_line)
-
-    f_contact_threshold = 50
-    cal =   int( math.fabs( fmal[-1] ) > f_contact_threshold ) 
-    car =   int( math.fabs( fmar[-1] ) > f_contact_threshold ) 
-    cbl =   int( math.fabs( fmbl[-1] ) > f_contact_threshold ) 
-    cbr =   int( math.fabs( fmbr[-1] ) > f_contact_threshold ) 
-
-    traj_dicts.append( { 'q': q,
-                    'q_des' : dq,
-                    'dq' : q_des,
-                    'dq_des' : dq_des,
-                    'trq' : trq,
-                    'contact_al' : cal,
-                    'contact_ar' : car,
-                    'contact_bl' : cbl,
-                    'contact_br' : cbr,
-                    'f_mag_al' : fmal,
-                    'f_mag_ar' : fmar,
-                    'f_mag_bl' : fmbl,
-                    'f_mag_br' : fmbr,
-                    'base_ori' : bo} )
-
-  #print("size of traj dicts = " + str(len(traj_dicts)))
-  #print(traj_dicts[-1])
-
-  return traj_dicts
 
 
 def traj_to_graph(traj_dict):
@@ -131,11 +68,12 @@ def traj_to_graph(traj_dict):
                       contact_al/ar/bl/br, f_mag_al/ar/bl/br, base_ori )
 
   Returns 
-    dynamic_graph : graph that has {global: base_ori,
+    dynamic_graph : graph that has {global: base_ori --> z-dir and mode(theta,180),
                                     node : contact, magforce
                                     edge : q,dq,q_des,dq_des}
     target_edge_tr : list of target edge feature
   '''
+  dyn_globals = []
   dyn_nodes = []
   dyn_edges = []
   ContactLink = {'AR_foot_link_3' : ['contact_ar', 'f_mag_ar'] ,
@@ -143,15 +81,16 @@ def traj_to_graph(traj_dict):
                  'AL_foot_link_3' : ['contact_al', 'f_mag_al'] , 
                  'BL_foot_link_3' : ['contact_bl', 'f_mag_bl'] }
 
+  # dyn_nodes
   for linkname in MagnetoGraphNode:
     if(linkname in ContactLink):
       data = [ traj_dict[ContactLink[linkname][0]] ]
       data.extend(traj_dict[ContactLink[linkname][1]])
     else:
       data = [0, 0.0, 0.0, 0.0]
-
     dyn_nodes.append(data)
 
+  # dyn_edges
   target_edge_tr = []
   for jointname in MagnetoGraphEdge:
     data = [ traj_dict['q'][ MagnetoJoint[jointname] ] ]
@@ -161,7 +100,20 @@ def traj_to_graph(traj_dict):
     dyn_edges.append(data)
     target_edge_tr.append([traj_dict['trq'][ MagnetoJoint[jointname] ]])
 
-  dynamic_graph = magneto_graph(traj_dict['base_ori'], dyn_nodes, dyn_edges)
+  # dyn_globals
+  base_quat = traj_dict['base_ori'] # w,x,y,z
+  base_rz = myutils.quat_to_rot_axis(base_quat,'z')
+  base_rx = myutils.quat_to_rot_axis(base_quat,'x')
+  base_rx_zero = np.cross(base_rz, [0.,1.,0.])
+  base_rx_zero = myutils.normalize(base_rx_zero)
+  delta_theta_rx = myutils.angle_between_axes(base_rx_zero, base_rx)
+  delta_theta_rx = myutils.mod_angle(delta_theta_rx, [-np.pi/2, np.pi/2])
+
+  dyn_globals.extend(base_rz)
+  dyn_globals.append(delta_theta_rx)
+
+  # magneto graph
+  dynamic_graph = magneto_graph(dyn_globals, dyn_nodes, dyn_edges)
   
   return dynamic_graph, target_edge_tr
 
@@ -202,18 +154,15 @@ def concat_graph(graph_dicts):
 
 ##############################
 
-def generate_graphs_dicts(rand, batch_size, traj_idx_min_max, static_graph, traj_dicts):
+def generate_graphs_dicts(batch_size, traj_idx_min_max, static_graph, trajDataSet):
   
   input_graphs_dicts = []
   target_graphs_dicts = []
+  traj_dicts = trajDataSet.batch(batch_size)
 
-  emptynode = [[0]]*len(MagnetoGraphNode)
-
-  traj_idx_start = rand.randint(*traj_idx_min_max)
-
-  for traj_idx in range(traj_idx_start, traj_idx_start + batch_size):
-
-    dynamic_graph, target_edge = traj_to_graph(traj_dicts[traj_idx])
+  for traj_dict in traj_dicts:
+    # dynamic_graph, target_edge = traj_to_graph(traj_dicts[traj_idx])
+    dynamic_graph, target_edge = traj_to_graph(tf.gather(traj_dicts,traj_idx))
     input_graph = concat_graph([dynamic_graph, static_graph])
     output_grpah = magneto_graph([], [], target_edge)
 
@@ -222,10 +171,10 @@ def generate_graphs_dicts(rand, batch_size, traj_idx_min_max, static_graph, traj
 
   return input_graphs_dicts, target_graphs_dicts
 
-def create_graph_tuples(rand, batch_size, 
-                  traj_idx_min_max, static_graph, traj_dicts):
+def create_graph_tuples(batch_size, 
+                  traj_idx_min_max, static_graph, trajDataSet):
     input_graphs_dicts, target_graphs_dicts = generate_graphs_dicts(
-      rand, batch_size, traj_idx_min_max, static_graph, traj_dicts )
+                batch_size, traj_idx_min_max, static_graph, trajDataSet )
     
     inputs_tr = utils_tf.data_dicts_to_graphs_tuple(input_graphs_dicts)
     outputs_tr = utils_tf.data_dicts_to_graphs_tuple(target_graphs_dicts)
@@ -253,3 +202,57 @@ def create_loss_ops(target_op, output_ops):
               tf.reduce_sum((output_op.edges - target_op.edges)**2, axis=-1))
               for output_op in output_ops   ]
   return loss_ops
+
+
+
+
+
+
+##############################
+
+# NODES = "nodes"
+# EDGES = "edges"
+# RECEIVERS = "receivers"
+# SENDERS = "senders"
+# GLOBALS = "globals"
+# N_NODE = "n_node"
+# N_EDGE = "n_edge"
+# ALL_FIELDS = (NODES, EDGES, RECEIVERS, SENDERS, GLOBALS, N_NODE, N_EDGE)
+
+def tensor_to_list(ts, axis=0):
+  shape_list = ts.shape.as_list()
+  split_size = shape_list[axis]
+
+  ts_list = tf.split(value=ts, axis=axis, num_or_size_splits=split_size)
+  return [ tf.squeeze(ts_split, [axis], name=None) for ts_split in ts_list]
+
+
+
+def graph_split(graph_tuples_batch):
+
+  nodes = tensor_to_list(graph_tuples_batch.nodes)
+
+  edges = tensor_to_list(graph_tuples_batch.edges)
+  globals_ = tensor_to_list(graph_tuples_batch.globals)
+
+  receivers = tensor_to_list(graph_tuples_batch.receivers)
+  senders = tensor_to_list(graph_tuples_batch.senders)
+
+  n_node = tensor_to_list(graph_tuples_batch.n_node)
+  n_edge = tensor_to_list(graph_tuples_batch.n_edge)
+
+  n_graph = len(n_edge)
+
+  return [
+   graph_tuples_batch.replace(nodes=nodes[i], edges=edges[i], globals=globals_[i],
+   receivers=receivers[i], senders=senders[i], n_node=n_node[i], n_edge=n_edge[i])
+   for i in range(n_graph) ] 
+
+def graph_reshape(graph_tuples_batch):
+  graph_lists = graph_split(graph_tuples_batch)
+  concat_graph_tuples = utils_tf.concat(graph_lists, axis=0)
+  return concat_graph_tuples
+
+
+
+

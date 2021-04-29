@@ -21,56 +21,58 @@ from graph_nets import utils_tf
 from graph_nets.demos_tf2 import models
 
 from model.magnetoDefinition import *
-from graphDataGeneration import *
+from model.magnetoGraphGeneration import *
 from functions import *
 
-SEED = 1
-np.random.seed(SEED)
-tf.random.set_seed(SEED)
-seed = 2
-rand = np.random.RandomState(seed=seed)
-
 CURRENT_DIR_PATH = os.path.dirname(os.path.realpath(__file__))
-
-
 #####################################################################################
 
 # Model parameters.
-num_processing_steps_tr = 5
-num_processing_steps_ge = 5
+num_processing_steps_tr = 3
+num_processing_steps_ge = 3
 
 # Data / training parameters.
 num_training_iterations = 5000000
-batch_size_tr = 500 #256
+batch_size_tr = 800 #256
 batch_size_ge = 100
 num_time_steps = 50
 step_size = 0.001
 
+###########################################################
 # LOAD DATA
-traj_dicts = read_trajectory() 
-traj_dicts = traj_dicts[500:3000]
-N_traj = len(traj_dicts)
-static_graph = magneto_base_graph('magneto-tf2/model/MagnetoSim_Dart.urdf') # data_dicts
-traj_idx_min_max_tr = (0, N_traj-batch_size_tr)
+print("============ LOAD DATA =============")
+# Base graphs for training. (static graph - link/joint info)
+static_graph = magneto_base_graph(CURRENT_DIR_PATH + '/model/MagnetoSim_Dart.urdf') # data_dicts
 
+# construct trajectory dataset
+gen = get_trajectory_data()
+trajDataSet_signature = get_traj_specs_from_graphs_tuples(next(gen))
+trajDataSet = tf.data.Dataset.from_generator(get_trajectory_data,
+                        output_signature = trajDataSet_signature )
 
-# Data.
-@tf.function
-def get_data():
-  # graph_tuple data
-  inputs_tr, targets_tr, = create_graph_tuples(rand, batch_size_tr, 
-                  traj_idx_min_max_tr, static_graph, traj_dicts)
+dataset = trajDataSet.batch(batch_size_tr, drop_remainder=True)
+for train_traj_tr in dataset :
+    inputs_tr = graph_reshape(train_traj_tr[0])
+    targets_tr = graph_reshape(train_traj_tr[1])
+    break
 
-  return inputs_tr, targets_tr
-
-
+traj_signature = (
+  utils_tf.specs_from_graphs_tuple(inputs_tr),
+  utils_tf.specs_from_graphs_tuple(targets_tr)
+)
 #####################################################################################
+# SET MODEL
+print("============ set models =============")
+
+# Optimizer.
+learning_rate = 1e-4
+optimizer = snt.optimizers.Adam(learning_rate)
 
 model = models.EncodeProcessDecode(edge_output_size=1)
-inputs_tr, targets_tr = get_data()
-output_tr = model(inputs_tr, num_processing_steps_tr)
 
-print("--------------------------1-------------------")
+output_ops_tr = model(inputs_tr, num_processing_steps_tr)
+
+print("1. initial model -------------------")
 print(type(model.variables))
 
 for tfvar_model in model.variables:
@@ -78,34 +80,23 @@ for tfvar_model in model.variables:
     print(type(tfvar_model))
     print(tfvar_model)
 
-#####################################################################################
-
+print("2. load model and assign value -------------------")
 loaded = tf.saved_model.load( CURRENT_DIR_PATH + "/saved_model")
-
-print("--------------------------2-------------------")
-
 for tfvar_load in loaded.all_variables:
-  print("loaded model variable name : " + tfvar_load.name)
+  # print("loaded model variable name : " + tfvar_load.name)
   for tfvar_model in model.variables:
     if tfvar_model.name == tfvar_load.name:
       tfvar_model.assign(tfvar_load.value())
-      print(tfvar_load.name + " is changed")
+      # print(tfvar_load.name + " is changed")
 
-
-print("--------------------------3-------------------")
+print("3. loadded model -------------------")
 for tfvar_model in model.variables:
   if "EncodeProcessDecode/MLPGraphNetwork/graph_network/edge_block/mlp/linear_0/b" in tfvar_model.name:
     print(type(tfvar_model))
     print(tfvar_model)
 
-
-
 #####################################################################################
-
-# Optimizer.
-learning_rate = 1e-3
-optimizer = snt.optimizers.Adam(learning_rate)
-
+print("============ def functions =============")
 def update_step(inputs_tr, targets_tr):
   with tf.GradientTape() as tape:
     output_ops_tr = model(inputs_tr, num_processing_steps_tr)
@@ -118,20 +109,19 @@ def update_step(inputs_tr, targets_tr):
   optimizer.apply(gradients, model.trainable_variables)
   return output_ops_tr, loss_tr
 
-
-# Get some example data that resembles the tensors that will be fed
-# into update_step():
-example_input_data, example_target_data = get_data()
-
-# Get the input signature for that function by obtaining the specs
-input_signature_tr = [
-  utils_tf.specs_from_graphs_tuple(example_input_data),
-  utils_tf.specs_from_graphs_tuple(example_target_data)
-]
-
 # Compile the update function using the input signature for speedy code.
-compiled_update_step = tf.function(update_step, input_signature=input_signature_tr)
+compiled_update_step = tf.function(update_step, input_signature=traj_signature)
 
+log_f = open(CURRENT_DIR_PATH + "/results/time_per_loss_load.csv", 'w')
+
+def save_data(time, loss, f):
+  print("save data")
+  log_f.write(str(time))
+  log_f.write(', ')
+  log_f.write(str(loss.numpy()))
+  log_f.write('\n')
+
+###################################################
 # Train
 log_every_seconds = 20
 TOTAL_TIMER = Timer()
@@ -139,30 +129,43 @@ LOG_TIMER = Timer()
 
 losses_tr=[]
 
-@tf.function(input_signature=utils_tf.specs_from_graphs_tuple(example_input_data))
-def inference(x):
-  return model(x, num_processing_steps_tr)
-
-min_loss = [2e-2]
+epoch = 0
+batch_iter = 0
+min_loss = [20] #0.02
+print("============ start training =============")
 
 for iteration in range(0, num_training_iterations):
-  inputs_tr, targets_tr = get_data()
-  outputs_tr, loss_tr = compiled_update_step(inputs_tr, targets_tr)
+  # 1 epoch
+  batch_iter = 0
+  batch_loss_sum = 0
+  for train_traj_tr in dataset :
+    inputs_tr = graph_reshape(train_traj_tr[0])
+    targets_tr = graph_reshape(train_traj_tr[1])
+    outputs_tr, loss_tr = compiled_update_step(inputs_tr, targets_tr)
+    # outputs_tr, loss_tr = update_step(inputs_tr, targets_tr)
+    batch_loss_sum = batch_loss_sum + loss_tr
+    # print("batch_iter = {:02d}".format(batch_iter))
+    # batch_iter = batch_iter+1
 
+  print("epoch_iter = {:02d}".format(epoch))
+  epoch = epoch+1
+
+
+  
   if LOG_TIMER.check(log_every_seconds):
     elapsed = TOTAL_TIMER.elapsed()
-    losses_tr.append(loss_tr)
-    print(" T {:.1f}, Ltr {:.4f}".format(elapsed, loss_tr) )
+    losses_tr.append(batch_loss_sum)
+    print(" T {:.1f}, Ltr {:.4f}".format(elapsed, batch_loss_sum) )
     # print(targets_tr.edges - outputs_tr[-1].edges)
 
     # print(model.variables)
 
-    if(min_loss[-1] >  loss_tr):
-      min_loss.append(loss_tr)    
+    if(min_loss[-1] >  batch_loss_sum):
+      min_loss.append(batch_loss_sum)
       to_save = snt.Module()
       # to_save.inference = inference #inference
       to_save.all_variables = list(model.variables)    
       tf.saved_model.save(to_save, CURRENT_DIR_PATH + "/saved_model")
-
-
+      
+      save_data(elapsed, batch_loss_sum, log_f)
       print(" model saved " )

@@ -33,7 +33,7 @@ num_processing_steps_ge = 5
 
 # Data / training parameters.
 num_training_iterations = 5000000
-batch_size_tr = 500 #256
+batch_size_tr = 2500 #256
 batch_size_ge = 100
 num_time_steps = 50
 step_size = 0.001
@@ -108,12 +108,38 @@ def diff_model(inputs_tr, targets_tr):
                   for output_op_tr in output_ops_tr ]
   return diff_ops_tr
 
+def save_data(inputs_tr, targets_tr, filename):
+  output_ops_tr = model(inputs_tr, num_processing_steps_tr)
+  f = open(filename + '_target.csv', 'w')
+  save_graph_edge(targets_tr, f)
 
-# Check model accuracy
+  for count, output_op_tr in enumerate(output_ops_tr):
+    f = open(filename + '_output' + str(count) + '.csv', 'w')
+    save_graph_edge(output_op_tr, f)
 
-inputs_tr, targets_tr = get_data()
-diff_ops_tr = diff_model(inputs_tr, targets_tr)
 
-for diff_op_tr in diff_ops_tr:
-  print("-----------------------")
-  print(diff_op_tr)
+def save_graph_edge(input_graph_tuples, f):
+  n_graph = utils_tf.get_num_graphs(input_graph_tuples)
+  # print("there is {:02d} graph".format(n_graph))
+
+  for i in range(n_graph):
+    sliced_graph = utils_tf.get_graph(input_graph_tuples,i)
+    edge_tensor = sliced_graph.edges
+    edge_list = edge_tensor.numpy()
+
+    for edge in edge_list:
+      f.write(str(edge[0]))
+      f.write(' ')
+
+    f.write('\n')
+
+
+FILENAME = CURRENT_DIR_PATH + '/results/resultfile'
+save_data(inputs_tr, targets_tr, FILENAME)
+
+
+# for diff_op_tr in diff_ops_tr:
+#   print("-----------------------")
+#   print(type(diff_op_tr))
+#   print()
+#   print(diff_op_tr)

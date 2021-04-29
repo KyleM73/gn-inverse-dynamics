@@ -7,13 +7,9 @@ import itertools
 import time
 import os 
 
-
 import numpy as np
 import tensorflow as tf
 import sonnet as snt 
-
-print(tf.__version__)
-print(snt.__version__)
 
 from graph_nets import graphs
 from graph_nets import utils_np
@@ -21,19 +17,11 @@ from graph_nets import utils_tf
 from graph_nets.demos_tf2 import models
 
 from model.magnetoDefinition import *
-from graphDataGeneration import *
+from model.magnetoGraphGeneration import *
 from functions import *
-
-SEED = 1
-np.random.seed(SEED)
-tf.random.set_seed(SEED)
-seed = 2
-rand = np.random.RandomState(seed=seed)
 
 CURRENT_DIR_PATH = os.path.dirname(os.path.realpath(__file__))
 ###########################################################
-
-
 
 # Model parameters.
 num_processing_steps_tr = 5
@@ -41,46 +29,48 @@ num_processing_steps_ge = 5
 
 # Data / training parameters.
 num_training_iterations = 50000
-batch_size_tr = 800 #256
+batch_size_tr = 500 #256
 batch_size_ge = 100
 num_time_steps = 50
 step_size = 0.001
 
 ###########################################################
 # LOAD DATA
+print("============ LOAD DATA =============")
+# Base graphs for training. (static graph - link/joint info)
+static_graph = magneto_base_graph(CURRENT_DIR_PATH + '/model/MagnetoSim_Dart.urdf') # data_dicts
 
-# Read Trajectory Data and construct graphs for training
-# traj_dicts : q, q_des, dotq, dotq_des, trq, foot_ct, base_ori 
-traj_dicts = read_trajectory() 
-traj_dicts = traj_dicts[500:3000]
-N_traj = len(traj_dicts)
-# print("traj_dicts size = ")
-# print( len(traj_dicts) )
+gen = get_trajectory_data()
+# traj_type, traj_shape = get_traj_type_shape_from_dicts(next(gen))
+trajDataSet_signature = get_traj_specs_from_graphs_tuples(next(gen))
+trajDataSet = tf.data.Dataset.from_generator(get_trajectory_data,
+                        output_signature = trajDataSet_signature )
 
-# Base graphs for training. (static graph)
-static_graph = magneto_base_graph('magneto-tf2/model/MagnetoSim_Dart.urdf') # data_dicts
+dataset = trajDataSet.batch(batch_size_tr, drop_remainder=True)
+for train_traj_tr in dataset :
+    inputs_tr = graph_reshape(train_traj_tr[0])
+    targets_tr = graph_reshape(train_traj_tr[1])
+    break
 
-traj_idx_min_max_tr = (0, N_traj-batch_size_tr)
-print(traj_idx_min_max_tr)
+traj_signature = (
+  utils_tf.specs_from_graphs_tuple(inputs_tr),
+  utils_tf.specs_from_graphs_tuple(targets_tr)
+)
+
 ###########################################################
-
-# Data.
-@tf.function
-def get_data():
-  # graph_tuple data
-  inputs_tr, targets_tr, = create_graph_tuples(rand, batch_size_tr, 
-                  traj_idx_min_max_tr, static_graph, traj_dicts)
-
-  return inputs_tr, targets_tr
-
+# SET MODEL
+print("============ set models =============")
 
 # Optimizer.
-learning_rate = 1e-3
+learning_rate = 1e-2
 optimizer = snt.optimizers.Adam(learning_rate)
 
 # Connect the data to the model.
 # Instantiate the model.
 model = models.EncodeProcessDecode(edge_output_size=1)
+
+
+print("============ def functions =============")
 
 def update_step(inputs_tr, targets_tr):
   with tf.GradientTape() as tape:
@@ -95,50 +85,62 @@ def update_step(inputs_tr, targets_tr):
   return output_ops_tr, loss_tr
 
 
-# Get some example data that resembles the tensors that will be fed
-# into update_step():
-example_input_data, example_target_data = get_data()
-
-# Get the input signature for that function by obtaining the specs
-input_signature_tr = [
-  utils_tf.specs_from_graphs_tuple(example_input_data),
-  utils_tf.specs_from_graphs_tuple(example_target_data)
-]
 
 # Compile the update function using the input signature for speedy code.
-compiled_update_step = tf.function(update_step, input_signature=input_signature_tr)
+compiled_update_step = tf.function(update_step, input_signature=traj_signature)
 
+
+def save_data(time, loss, f):  
+  f.write(str(time))
+  f.write(', ')
+  f.write(str(loss.numpy()))
+  f.write('\n')
+
+###################################################3
 # Train
 log_every_seconds = 20
 TOTAL_TIMER = Timer()
 LOG_TIMER = Timer()
+log_f = open(CURRENT_DIR_PATH + "/results/time_per_loss.csv", 'w')
 
 losses_tr=[]
 
-@tf.function(input_signature=utils_tf.specs_from_graphs_tuple(example_input_data))
-def inference(x):
-  return model(x, num_processing_steps_tr)
+epoch = 0
+batch_iter = 0
+min_loss = [1e2] #0.02
+print("============ start training =============")
+
 
 for iteration in range(0, num_training_iterations):
-  inputs_tr, targets_tr = get_data()
-  outputs_tr, loss_tr = compiled_update_step(inputs_tr, targets_tr)
 
+  # 1 epoch
+  batch_iter = 0
+  batch_loss_sum = 0.
+  for train_traj_tr in dataset :
+    inputs_tr = graph_reshape(train_traj_tr[0])
+    targets_tr = graph_reshape(train_traj_tr[1])
+    outputs_tr, loss_tr = compiled_update_step(inputs_tr, targets_tr)
+    batch_loss_sum = batch_loss_sum + loss_tr
+    # outputs_tr, loss_tr = update_step(inputs_tr, targets_tr)
+
+    # print("batch_iter = {:02d}".format(batch_iter))
+    # batch_iter = batch_iter+1
+
+  print("epoch_iter = {:02d}".format(epoch))
+  epoch = epoch+1
+    
+    
   if LOG_TIMER.check(log_every_seconds):
     elapsed = TOTAL_TIMER.elapsed()
-    losses_tr.append(loss_tr)
-    print(" T {:.1f}, Ltr {:.4f}".format(elapsed, loss_tr) )
-    # print(targets_tr.edges - outputs_tr[-1].edges)
+    losses_tr.append(batch_loss_sum)
+    print(" T {:.1f}, Ltr {:.4f}".format(elapsed, batch_loss_sum) )
 
-    # print(model.variables)
-    
-    to_save = snt.Module()
-    # to_save.inference = inference #inference
-    to_save.all_variables = list(model.variables)    
-    tf.saved_model.save(to_save, CURRENT_DIR_PATH + "/saved_model")
+    if(min_loss[-1] >  batch_loss_sum):
+      min_loss.append(batch_loss_sum)
+      to_save = snt.Module()
+      # to_save.inference = inference #inference
+      to_save.all_variables = list(model.variables)    
+      tf.saved_model.save(to_save, CURRENT_DIR_PATH + "/saved_model")
 
-
-    print(" model saved " )
-
-
-
-
+      save_data(elapsed, batch_loss_sum, log_f)
+      print(" model saved " )
