@@ -33,7 +33,7 @@ num_processing_steps_ge = 3
 
 # Data / training parameters.
 num_training_iterations = 5000000
-batch_size_tr = 800 #256
+batch_size_tr = 1500 #256
 batch_size_ge = 100
 num_time_steps = 50
 step_size = 0.001
@@ -114,12 +114,12 @@ compiled_update_step = tf.function(update_step, input_signature=traj_signature)
 
 log_f = open(CURRENT_DIR_PATH + "/results/time_per_loss_load.csv", 'w')
 
-def save_data(time, loss, f):
-  print("save data")
-  log_f.write(str(time))
-  log_f.write(', ')
-  log_f.write(str(loss.numpy()))
-  log_f.write('\n')
+def save_data(time, loss, log_f):
+  # print("save data")
+  # log_f.write(str(time))
+  # log_f.write(', ')
+  # log_f.write(str(loss.numpy()))  
+  log_f.write(" {:.1f}, {:.4f} \n".format(elapsed, batch_loss_sum) )
 
 ###################################################
 # Train
@@ -169,3 +169,12 @@ for iteration in range(0, num_training_iterations):
       
       save_data(elapsed, batch_loss_sum, log_f)
       print(" model saved " )
+
+
+      print("ouput = ")
+      print(outputs_tr[-1].edges)
+      print("target = ")
+      print(targets_tr.edges)
+      print("diff = ")
+      print(outputs_tr[-1].edges- targets_tr.edges)
+      print(" ================================================ " )

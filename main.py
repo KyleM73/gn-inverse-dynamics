@@ -16,6 +16,8 @@ from graph_nets import utils_np
 from graph_nets import utils_tf
 from graph_nets.demos_tf2 import models
 
+
+import nn_models as mymodels
 from model.magnetoDefinition import *
 from model.magnetoGraphGeneration import *
 from functions import *
@@ -24,12 +26,13 @@ CURRENT_DIR_PATH = os.path.dirname(os.path.realpath(__file__))
 ###########################################################
 
 # Model parameters.
-num_processing_steps_tr = 5
-num_processing_steps_ge = 5
+num_processing_steps_tr = 3
+num_processing_steps_ge = 3
+
 
 # Data / training parameters.
 num_training_iterations = 50000
-batch_size_tr = 500 #256
+batch_size_tr = 200 #256
 batch_size_ge = 100
 num_time_steps = 50
 step_size = 0.001
@@ -62,13 +65,13 @@ traj_signature = (
 print("============ set models =============")
 
 # Optimizer.
-learning_rate = 1e-2
+learning_rate = 1e-3
 optimizer = snt.optimizers.Adam(learning_rate)
 
 # Connect the data to the model.
 # Instantiate the model.
 model = models.EncodeProcessDecode(edge_output_size=1)
-
+# model = mymodels.LimitEncodeProcessDecode(edge_output_size=1)
 
 print("============ def functions =============")
 
@@ -89,19 +92,20 @@ def update_step(inputs_tr, targets_tr):
 # Compile the update function using the input signature for speedy code.
 compiled_update_step = tf.function(update_step, input_signature=traj_signature)
 
+log_f = open(CURRENT_DIR_PATH + '/results/time_per_loss.csv', 'w')
 
-def save_data(time, loss, f):  
-  f.write(str(time))
-  f.write(', ')
-  f.write(str(loss.numpy()))
-  f.write('\n')
+def save_data(time, loss):  
+  log_f.write(str(time))
+  log_f.write(', ')
+  log_f.write(str(loss.numpy()))
+  log_f.write('\n')
+  print(" save_data - model saved " )
 
 ###################################################3
 # Train
 log_every_seconds = 20
 TOTAL_TIMER = Timer()
 LOG_TIMER = Timer()
-log_f = open(CURRENT_DIR_PATH + "/results/time_per_loss.csv", 'w')
 
 losses_tr=[]
 
@@ -122,11 +126,12 @@ for iteration in range(0, num_training_iterations):
     outputs_tr, loss_tr = compiled_update_step(inputs_tr, targets_tr)
     batch_loss_sum = batch_loss_sum + loss_tr
     # outputs_tr, loss_tr = update_step(inputs_tr, targets_tr)
+    
 
     # print("batch_iter = {:02d}".format(batch_iter))
     # batch_iter = batch_iter+1
 
-  print("epoch_iter = {:02d}".format(epoch))
+  print("epoch_iter = {:02d}, Ltr {:.4f}".format(epoch, batch_loss_sum))
   epoch = epoch+1
     
     
@@ -142,5 +147,13 @@ for iteration in range(0, num_training_iterations):
       to_save.all_variables = list(model.variables)    
       tf.saved_model.save(to_save, CURRENT_DIR_PATH + "/saved_model")
 
-      save_data(elapsed, batch_loss_sum, log_f)
+      save_data(elapsed, batch_loss_sum)
       print(" model saved " )
+
+      print("ouput = ")
+      print(outputs_tr[-1].edges)
+      print("target = ")
+      print(targets_tr.edges)
+      print("diff = ")
+      print(outputs_tr[-1].edges- targets_tr.edges)
+      print(" ================================================ " )

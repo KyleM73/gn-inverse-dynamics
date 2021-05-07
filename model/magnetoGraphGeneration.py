@@ -156,7 +156,7 @@ def string_to_list(str):
 def get_trajectory_data():
   # q, q_des, dotq, dotq_des, trq, contact_al, f_mag_al, base_ori
   path = '/home/jelee/GNN/graph-nets-physics/magneto-tf2-rotation-invariant'
-  print("get_trajectory_data")
+  # print("get_trajectory_data")
   f_q = open(path + "/data/q_sen.txt")
   f_dq = open(path + "/data/qdot_sen.txt")
   f_trq = open(path + "/data/trq.txt")
