@@ -157,30 +157,30 @@ def get_trajectory_data():
   # q, q_des, dotq, dotq_des, trq, contact_al, f_mag_al, base_ori
   path = '/home/jelee/GNN/graph-nets-physics/magneto-tf2-rotation-invariant'
   # print("get_trajectory_data")
-  f_q = open(path + "/data/q_sen.txt")
-  f_dq = open(path + "/data/qdot_sen.txt")
-  f_trq = open(path + "/data/trq.txt")
+  f_q = open(path + "/dataMerged/datafinal/q_sen.txt")
+  f_dq = open(path + "/dataMerged/datafinal/qdot_sen.txt")
 
-  f_base_pos = open(path + "/data/pose_base.txt")
-  f_base_ori = open(path + "/data/rot_base.txt")
+  f_q_d = open(path + "/dataMerged/datafinal/q_des.txt")
+  f_dq_d = open(path + "/dataMerged/datafinal/qdot_des.txt")
+  
+  f_trq = open(path + "/dataMerged/datafinal/trq.txt")
 
-  f_mag_al = open(path + "/data/magnetic_AL_foot_link.txt")
-  f_mag_ar = open(path + "/data/magnetic_AR_foot_link.txt")
-  f_mag_bl = open(path + "/data/magnetic_BL_foot_link.txt")
-  f_mag_br = open(path + "/data/magnetic_BR_foot_link.txt")
+  f_base_ori = open(path + "/dataMerged/datafinal/rot_base.txt")
 
-  q_des = string_to_list(f_q.readline())
-  dq_des = string_to_list(f_dq.readline())  
+  f_mag_al = open(path + "/dataMerged/datafinal/magnetic_AL_foot_link.txt")
+  f_mag_ar = open(path + "/dataMerged/datafinal/magnetic_AR_foot_link.txt")
+  f_mag_bl = open(path + "/dataMerged/datafinal/magnetic_BL_foot_link.txt")
+  f_mag_br = open(path + "/dataMerged/datafinal/magnetic_BR_foot_link.txt")
 
-  for q_line, dq_line, trq_line, bp_line, bo_line, fmal_line, fmar_line, fmbl_line, fmbr_line \
-    in zip(f_q, f_dq, f_trq, f_base_pos, f_base_ori, f_mag_al, f_mag_ar, f_mag_bl, f_mag_br) : 
+  for q_line, qd_line, dq_line, dqd_line, trq_line,  bo_line, fmal_line, fmar_line, fmbl_line, fmbr_line \
+    in zip(f_q, f_q_d, f_dq, f_dq_d, f_trq, f_base_ori, f_mag_al, f_mag_ar, f_mag_bl, f_mag_br) : 
     
-    q = q_des
-    dq = dq_des
-    q_des = string_to_list(q_line)  
-    dq_des = string_to_list(dq_line)  
+    q = string_to_list(q_line)
+    dq = string_to_list(dq_line)
+    q_des = string_to_list(qd_line)  
+    dq_des = string_to_list(dqd_line)  
     trq = string_to_list(trq_line)
-    #bp = string_to_list(bp_line)  
+  
     bo = string_to_list(bo_line)  
     fmal = string_to_list(fmal_line)    
     fmar = string_to_list(fmar_line)  
@@ -218,22 +218,6 @@ def get_trajectory_data():
 
 
     yield ( dynamic_graph_tsr, target_graph_tsr )
-
-
-    # yield { 'q':  tf.convert_to_tensor(q),
-    #         'q_des' : tf.convert_to_tensor(dq),
-    #         'dq' : tf.convert_to_tensor(q_des),
-    #         'dq_des' : tf.convert_to_tensor(dq_des),
-    #         'trq' : tf.convert_to_tensor(trq),
-    #         'contact_al' : tf.convert_to_tensor(cal),
-    #         'contact_ar' : tf.convert_to_tensor(car),
-    #         'contact_bl' : tf.convert_to_tensor(cbl),
-    #         'contact_br' : tf.convert_to_tensor(cbr),
-    #         'f_mag_al' : tf.convert_to_tensor(fmal),
-    #         'f_mag_ar' : tf.convert_to_tensor(fmar),
-    #         'f_mag_bl' : tf.convert_to_tensor(fmbl),
-    #         'f_mag_br' : tf.convert_to_tensor(fmbr),
-    #         'base_ori' : tf.convert_to_tensor(bo) }  
 
 def get_traj_specs_from_graphs_tuples(graph_tuples):
   return (utils_tf.specs_from_graphs_tuple(graph_tuples[0]), 
