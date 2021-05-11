@@ -1,6 +1,7 @@
 # gn-inverse-dynamics
 
 developed based on [graph_nets](https://github.com/deepmind/graph_nets) from deepmind
+
 learning inverse dynamics of [Magneto](https://research.csiro.au/robotics/paper-magneto-a-versatile-multi-limbed-inspection-robot/)
 
 ## Virtual environment settings
