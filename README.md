@@ -11,7 +11,7 @@ learning inverse dynamics of [Magneto](https://research.csiro.au/robotics/paper-
 $ conda env create -f tf2-gnets.yml
 ```
 
-### Manual pip install
+### Pip list for manual install
 ```
 $ pip install --upgrade pip
 $ pip install tensorflow
@@ -29,7 +29,7 @@ $ pip install graph_nets "tensorflow>=2.1.0-rc1" "dm-sonnet>=2.0.0b0" tensorflow
 $ pip install graph_nets "tensorflow_gpu>=2.1.0-rc1" "dm-sonnet>=2.0.0b0" tensorflow_probability
 ```
 
-## code
+## Code Explanation
 - main.py : start trainig from random initial parameters, traning parameters are saved in "saved_model" folder
 - main_load.py : start training from "saved_model" parameters
 - load_test.py : check the saved parameters can be loaded well
