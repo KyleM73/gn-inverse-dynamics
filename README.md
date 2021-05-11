@@ -1,7 +1,7 @@
 # gn-inverse-dynamics
 
-## based on graph_nets from deepmind
-https://github.com/deepmind/graph_nets 
+## based on [graph_nets](https://github.com/deepmind/graph_nets) from deepmind
+
 
 ## Virtual environment settings
 
