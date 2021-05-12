@@ -102,26 +102,19 @@ output_folder = '/dataMerged/datafinal'
 output_list = output_file_list(global_path + output_folder)
 
 for i in range(12):
-    input_folder = '/dataMerged/data' + str(i)    
+    input_folder = '/dataMerged/rdata' + str(i)    
+    print(input_folder)
     input_zip = input_file_zip( global_path + input_folder)
 
-    chunk_size = 30
+    chunk_size = 50
+    writeoutput(input_zip, output_list, 500, chunk_size)
 
-    writeoutput(input_zip, output_list, 600, chunk_size)
-    writeoutput(input_zip, output_list, 200, chunk_size)
-    writeoutput(input_zip, output_list, 200, chunk_size)
-    writeoutput(input_zip, output_list, 200, chunk_size)
-    writeoutput(input_zip, output_list, 200, chunk_size)
-    writeoutput(input_zip, output_list, 200, chunk_size)
-    writeoutput(input_zip, output_list, 200, chunk_size)
-    writeoutput(input_zip, output_list, 200, chunk_size)
-    writeoutput(input_zip, output_list, 200, chunk_size)
-    writeoutput(input_zip, output_list, 200, chunk_size)
-    writeoutput(input_zip, output_list, 200, chunk_size)
-    writeoutput(input_zip, output_list, 200, chunk_size)
-    writeoutput(input_zip, output_list, 200, chunk_size)
-    writeoutput(input_zip, output_list, 200, chunk_size)
-    writeoutput(input_zip, output_list, 200, chunk_size)
-    writeoutput(input_zip, output_list, 200, chunk_size)
-    writeoutput(input_zip, output_list, 200, chunk_size)
+    while True:
+        try:
+            writeoutput(input_zip, output_list, 50, chunk_size)
+        except:
+            break
+
+
+
 
