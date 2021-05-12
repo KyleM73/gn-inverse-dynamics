@@ -18,7 +18,9 @@ print(snt.__version__)
 from graph_nets import graphs
 from graph_nets import utils_np
 from graph_nets import utils_tf
-from graph_nets.demos_tf2 import models
+# import gn_models as models
+import gn_models as models
+
 
 from model.magnetoDefinition import *
 from model.magnetoGraphGeneration import *
