@@ -33,7 +33,7 @@ num_processing_steps_ge = 3
 
 # Data / training parameters.
 num_training_iterations = 5000000
-batch_size_tr = 1500 #256
+batch_size_tr = 200 #256
 batch_size_ge = 100
 num_time_steps = 50
 step_size = 0.001
@@ -65,7 +65,7 @@ traj_signature = (
 print("============ set models =============")
 
 # Optimizer.
-learning_rate = 1e-4
+learning_rate = 1e-3
 optimizer = snt.optimizers.Adam(learning_rate)
 
 model = models.EncodeProcessDecode(edge_output_size=1)
@@ -112,7 +112,7 @@ def update_step(inputs_tr, targets_tr):
 # Compile the update function using the input signature for speedy code.
 compiled_update_step = tf.function(update_step, input_signature=traj_signature)
 
-log_f = open(CURRENT_DIR_PATH + "/results/time_per_loss_load.csv", 'w')
+log_f = open(CURRENT_DIR_PATH + "/results/time_per_loss_load.csv", 'a')
 
 def save_data(time, loss, log_f):
   # print("save data")
@@ -131,7 +131,7 @@ losses_tr=[]
 
 epoch = 0
 batch_iter = 0
-min_loss = [20] #0.02
+min_loss = [150] #0.02
 print("============ start training =============")
 
 for iteration in range(0, num_training_iterations):

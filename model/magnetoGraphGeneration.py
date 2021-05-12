@@ -12,6 +12,9 @@ from graph_nets import utils_tf
 from model.readRobot import *
 from model.magnetoDefinition import *
 
+
+CURRENT_DIR_PATH = os.path.dirname(os.path.realpath(__file__))
+
 # function need for rotation invarianct descriptions
 def shuffle_list(list_in):
     list_out = []
@@ -131,7 +134,8 @@ def magneto_graph(global_feature, nodes, edges):
 
 
 ###########################################################
-
+############        traj graph generation   ###############
+###########################################################
 
 def string_to_number(str):
   # if("." in str):
@@ -152,79 +156,97 @@ def string_to_list(str):
   return [string_to_number(element) 
           for element in str.split()]
 
+def get_trajectory_files(path, folder):
+  # q, q_des, dotq, dotq_des, trq, contact_al, f_mag_al, base_ori
+  f_q = open(path + folder + "/q_sen.txt")
+  f_dq = open(path + folder + "/qdot_sen.txt")
+
+  f_q_d = open(path + folder + "/q_des.txt")
+  f_dq_d = open(path + folder + "/qdot_des.txt")
+  
+  f_trq = open(path + folder + "/trq.txt")
+
+  f_base_ori = open(path + folder + "/rot_base.txt")
+
+  f_mag_al = open(path + folder + "/magnetic_AL_foot_link.txt")
+  f_mag_ar = open(path + folder + "/magnetic_AR_foot_link.txt")
+  f_mag_bl = open(path + folder + "/magnetic_BL_foot_link.txt")
+  f_mag_br = open(path + folder + "/magnetic_BR_foot_link.txt")
+  return zip(f_q, f_q_d, f_dq, f_dq_d, f_trq, f_base_ori, f_mag_al, f_mag_ar, f_mag_bl, f_mag_br)
+
+def traj_data_to_graph(q_line, qd_line, dq_line, dqd_line, trq_line,  
+                      o_line, fmal_line, fmar_line, fmbl_line, fmbr_line):
+
+  q = string_to_list(q_line)
+  dq = string_to_list(dq_line)
+  q_des = string_to_list(qd_line)  
+  dq_des = string_to_list(dqd_line)  
+  trq = string_to_list(trq_line)
+
+  bo = string_to_list(bo_line)  
+  fmal = string_to_list(fmal_line)    
+  fmar = string_to_list(fmar_line)  
+  fmbl = string_to_list(fmbl_line)  
+  fmbr = string_to_list(fmbr_line)
+
+  f_contact_threshold = 50
+  cal =   int( math.fabs( fmal[-1] ) > f_contact_threshold ) 
+  car =   int( math.fabs( fmar[-1] ) > f_contact_threshold ) 
+  cbl =   int( math.fabs( fmbl[-1] ) > f_contact_threshold ) 
+  cbr =   int( math.fabs( fmbr[-1] ) > f_contact_threshold )
+
+  traj_dict = { 'q': q,
+                'q_des' : dq,
+                'dq' : q_des,
+                'dq_des' : dq_des,
+                'trq' : trq,
+                'contact_al' : cal,
+                'contact_ar' : car,
+                'contact_bl' : cbl,
+                'contact_br' : cbr,
+                'f_mag_al' : fmal,
+                'f_mag_ar' : fmar,
+                'f_mag_bl' : fmbl,
+                'f_mag_br' : fmbr,
+                'base_ori' : bo }
+
+  dynamic_graph, target_graph = traj_to_graph( traj_dict )
+
+  dynamic_graph_tsr = utils_tf.data_dicts_to_graphs_tuple( [dynamic_graph] )
+  target_graph_tsr = utils_tf.data_dicts_to_graphs_tuple( [target_graph] )
+  dynamic_graph_tsr = dynamic_graph_tsr.replace(globals = tf.cast(dynamic_graph_tsr.globals, tf.float32))
+
+  return (dynamic_graph_tsr, target_graph_tsr)
+
+def get_trajectory_data_test():
+  data_path = CURRENT_DIR_PATH + '/../dataMerged'
+  test_folder = '/datafinal_test'
+  files_zip = get_trajectory_files(path=data_path, folder=test_folder)
+
+  for q_line, qd_line, dq_line, dqd_line, trq_line,  
+      bo_line, fmal_line, fmar_line, fmbl_line, fmbr_line in files_zip:    
+    
+    yield traj_data_to_graph(q_line, qd_line, dq_line, dqd_line, trq_line,  
+                      o_line, fmal_line, fmar_line, fmbl_line, fmbr_line)
 
 def get_trajectory_data():
-  # q, q_des, dotq, dotq_des, trq, contact_al, f_mag_al, base_ori
-  path = '/home/jelee/GNN/graph-nets-physics/magneto-tf2-rotation-invariant'
   # print("get_trajectory_data")
-  f_q = open(path + "/dataMerged/datafinal/q_sen.txt")
-  f_dq = open(path + "/dataMerged/datafinal/qdot_sen.txt")
+  #f_q, f_q_d, f_dq, f_dq_d, f_trq, f_base_ori, f_mag_al, f_mag_ar, f_mag_bl, f_mag_br)
+  data_path = CURRENT_DIR_PATH + '/../dataMerged'
+  train_folder = '/datafinal'
+  files_zip = get_trajectory_files(path=data_path, folder=train_folder)
 
-  f_q_d = open(path + "/dataMerged/datafinal/q_des.txt")
-  f_dq_d = open(path + "/dataMerged/datafinal/qdot_des.txt")
-  
-  f_trq = open(path + "/dataMerged/datafinal/trq.txt")
-
-  f_base_ori = open(path + "/dataMerged/datafinal/rot_base.txt")
-
-  f_mag_al = open(path + "/dataMerged/datafinal/magnetic_AL_foot_link.txt")
-  f_mag_ar = open(path + "/dataMerged/datafinal/magnetic_AR_foot_link.txt")
-  f_mag_bl = open(path + "/dataMerged/datafinal/magnetic_BL_foot_link.txt")
-  f_mag_br = open(path + "/dataMerged/datafinal/magnetic_BR_foot_link.txt")
-
-  for q_line, qd_line, dq_line, dqd_line, trq_line,  bo_line, fmal_line, fmar_line, fmbl_line, fmbr_line \
-    in zip(f_q, f_q_d, f_dq, f_dq_d, f_trq, f_base_ori, f_mag_al, f_mag_ar, f_mag_bl, f_mag_br) : 
+  for q_line, qd_line, dq_line, dqd_line, trq_line,  
+      bo_line, fmal_line, fmar_line, fmbl_line, fmbr_line in files_zip:    
     
-    q = string_to_list(q_line)
-    dq = string_to_list(dq_line)
-    q_des = string_to_list(qd_line)  
-    dq_des = string_to_list(dqd_line)  
-    trq = string_to_list(trq_line)
-  
-    bo = string_to_list(bo_line)  
-    fmal = string_to_list(fmal_line)    
-    fmar = string_to_list(fmar_line)  
-    fmbl = string_to_list(fmbl_line)  
-    fmbr = string_to_list(fmbr_line)
+    yield traj_data_to_graph(q_line, qd_line, dq_line, dqd_line, trq_line,  
+                      o_line, fmal_line, fmar_line, fmbl_line, fmbr_line)
 
-    f_contact_threshold = 50
-    cal =   int( math.fabs( fmal[-1] ) > f_contact_threshold ) 
-    car =   int( math.fabs( fmar[-1] ) > f_contact_threshold ) 
-    cbl =   int( math.fabs( fmbl[-1] ) > f_contact_threshold ) 
-    cbr =   int( math.fabs( fmbr[-1] ) > f_contact_threshold )
-
-    traj_dict = { 'q': q,
-                  'q_des' : dq,
-                  'dq' : q_des,
-                  'dq_des' : dq_des,
-                  'trq' : trq,
-                  'contact_al' : cal,
-                  'contact_ar' : car,
-                  'contact_bl' : cbl,
-                  'contact_br' : cbr,
-                  'f_mag_al' : fmal,
-                  'f_mag_ar' : fmar,
-                  'f_mag_bl' : fmbl,
-                  'f_mag_br' : fmbr,
-                  'base_ori' : bo }
-
-    dynamic_graph, target_graph = traj_to_graph( traj_dict )
-
-    dynamic_graph_tsr = utils_tf.data_dicts_to_graphs_tuple( [dynamic_graph] )
-    target_graph_tsr = utils_tf.data_dicts_to_graphs_tuple( [target_graph] )
-
-    dynamic_graph_tsr = dynamic_graph_tsr.replace(globals = tf.cast(dynamic_graph_tsr.globals, tf.float32))
-
-
-
-    yield ( dynamic_graph_tsr, target_graph_tsr )
 
 def get_traj_specs_from_graphs_tuples(graph_tuples):
   return (utils_tf.specs_from_graphs_tuple(graph_tuples[0]), 
             utils_tf.specs_from_graphs_tuple(graph_tuples[1]))
   
-
-
 def get_traj_type_shape_from_dict(example_dict):
   traj_type={}
   traj_shape={}

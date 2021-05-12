@@ -32,7 +32,7 @@ num_processing_steps_ge = 3
 
 # Data / training parameters.
 num_training_iterations = 50000
-batch_size_tr = 200 #256
+batch_size_tr = 750 #256
 batch_size_ge = 100
 num_time_steps = 50
 step_size = 0.001
@@ -111,7 +111,7 @@ losses_tr=[]
 
 epoch = 0
 batch_iter = 0
-min_loss = [1e2] #0.02
+min_loss = [23] #0.02
 print("============ start training =============")
 
 

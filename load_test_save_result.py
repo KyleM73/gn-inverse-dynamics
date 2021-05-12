@@ -46,9 +46,9 @@ static_graph = magneto_base_graph(CURRENT_DIR_PATH + '/model/MagnetoSim_Dart.urd
 
 # construct trajectory dataset
 # gen = get_trajectory_data()
-gen = get_trajectory_data2()
+gen = get_trajectory_data_test()
 trajDataSet_signature = get_traj_specs_from_graphs_tuples(next(gen))
-trajDataSet = tf.data.Dataset.from_generator(get_trajectory_data2,
+trajDataSet = tf.data.Dataset.from_generator(get_trajectory_data_test,
                         output_signature = trajDataSet_signature )
 
 dataset = trajDataSet.batch(batch_size_tr, drop_remainder=True)
