@@ -175,7 +175,7 @@ def get_trajectory_files(path, folder):
   return zip(f_q, f_q_d, f_dq, f_dq_d, f_trq, f_base_ori, f_mag_al, f_mag_ar, f_mag_bl, f_mag_br)
 
 def traj_data_to_graph(q_line, qd_line, dq_line, dqd_line, trq_line,  
-                      o_line, fmal_line, fmar_line, fmbl_line, fmbr_line):
+                      bo_line, fmal_line, fmar_line, fmbl_line, fmbr_line):
 
   q = string_to_list(q_line)
   dq = string_to_list(dq_line)
@@ -223,11 +223,11 @@ def get_trajectory_data_test():
   test_folder = '/datafinal_test'
   files_zip = get_trajectory_files(path=data_path, folder=test_folder)
 
-  for q_line, qd_line, dq_line, dqd_line, trq_line,  
+  for q_line, qd_line, dq_line, dqd_line, trq_line,\
       bo_line, fmal_line, fmar_line, fmbl_line, fmbr_line in files_zip:    
     
-    yield traj_data_to_graph(q_line, qd_line, dq_line, dqd_line, trq_line,  
-                      o_line, fmal_line, fmar_line, fmbl_line, fmbr_line)
+    yield traj_data_to_graph(q_line, qd_line, dq_line, dqd_line, trq_line,\
+                      bo_line, fmal_line, fmar_line, fmbl_line, fmbr_line)
 
 def get_trajectory_data():
   # print("get_trajectory_data")
@@ -236,11 +236,11 @@ def get_trajectory_data():
   train_folder = '/datafinal'
   files_zip = get_trajectory_files(path=data_path, folder=train_folder)
 
-  for q_line, qd_line, dq_line, dqd_line, trq_line,  
+  for q_line, qd_line, dq_line, dqd_line, trq_line,\
       bo_line, fmal_line, fmar_line, fmbl_line, fmbr_line in files_zip:    
     
-    yield traj_data_to_graph(q_line, qd_line, dq_line, dqd_line, trq_line,  
-                      o_line, fmal_line, fmar_line, fmbl_line, fmbr_line)
+    yield traj_data_to_graph(q_line, qd_line, dq_line, dqd_line, trq_line,
+                      bo_line, fmal_line, fmar_line, fmbl_line, fmbr_line)
 
 
 def get_traj_specs_from_graphs_tuples(graph_tuples):
