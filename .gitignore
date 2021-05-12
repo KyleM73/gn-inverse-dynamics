@@ -12,6 +12,6 @@ octave-workspace
 
 # Folders 
 saved_model*
-results
+results/*.csv
 dataMerged/rdata*
 dataMerged/datafinal_*
