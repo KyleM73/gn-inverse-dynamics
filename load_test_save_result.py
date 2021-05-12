@@ -33,7 +33,7 @@ num_processing_steps_ge = 5
 
 # Data / training parameters.
 num_training_iterations = 5000000
-batch_size_tr = 2500 #256
+batch_size_tr = 1000 #256
 batch_size_ge = 100
 num_time_steps = 50
 step_size = 0.001
@@ -45,9 +45,10 @@ print("============ LOAD DATA =============")
 static_graph = magneto_base_graph(CURRENT_DIR_PATH + '/model/MagnetoSim_Dart.urdf') # data_dicts
 
 # construct trajectory dataset
-gen = get_trajectory_data()
+# gen = get_trajectory_data()
+gen = get_trajectory_data2()
 trajDataSet_signature = get_traj_specs_from_graphs_tuples(next(gen))
-trajDataSet = tf.data.Dataset.from_generator(get_trajectory_data,
+trajDataSet = tf.data.Dataset.from_generator(get_trajectory_data2,
                         output_signature = trajDataSet_signature )
 
 dataset = trajDataSet.batch(batch_size_tr, drop_remainder=True)
