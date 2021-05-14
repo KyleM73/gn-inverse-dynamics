@@ -6,11 +6,13 @@ import os
 import tensorflow as tf
 import math
 
+
 import utils.myutils as myutils
 from graph_nets import utils_tf
 
 from model.readRobot import *
 from model.magnetoDefinition import *
+from utils.myutils import *
 
 
 CURRENT_DIR_PATH = os.path.dirname(os.path.realpath(__file__))
@@ -220,7 +222,7 @@ def traj_data_to_graph(q_line, qd_line, dq_line, dqd_line, trq_line,
 
 def get_trajectory_data_test():
   data_path = CURRENT_DIR_PATH + '/../dataMerged'
-  test_folder = '/datafinaltest'
+  test_folder = '/datafinal_test'
   files_zip = get_trajectory_files(path=data_path, folder=test_folder)
 
   for q_line, qd_line, dq_line, dqd_line, trq_line,\
@@ -232,6 +234,7 @@ def get_trajectory_data_test():
 def get_trajectory_data():
   # print("get_trajectory_data")
   #f_q, f_q_d, f_dq, f_dq_d, f_trq, f_base_ori, f_mag_al, f_mag_ar, f_mag_bl, f_mag_br)
+  lop_with_time("get_trajectory_data")
   data_path = CURRENT_DIR_PATH + '/../dataMerged'
   train_folder = '/datafinal'
   files_zip = get_trajectory_files(path=data_path, folder=train_folder)

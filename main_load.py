@@ -18,7 +18,6 @@ print(snt.__version__)
 from graph_nets import graphs
 from graph_nets import utils_np
 from graph_nets import utils_tf
-# import gn_models as models
 import gn_models as models
 
 

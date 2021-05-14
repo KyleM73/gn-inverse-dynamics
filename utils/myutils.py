@@ -1,6 +1,14 @@
 import math
 import numpy as np
+import time
+
+
 from scipy import spatial
+
+
+def lop_with_time(logmsg):
+    logt = time.time()
+    print("[{:.4f}] {}".format(logt, logmsg) )
 
 def quat_to_rot(quat):
   # input arg quat : w,x,y,z
