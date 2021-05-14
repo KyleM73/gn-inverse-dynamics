@@ -220,7 +220,7 @@ def traj_data_to_graph(q_line, qd_line, dq_line, dqd_line, trq_line,
 
 def get_trajectory_data_test():
   data_path = CURRENT_DIR_PATH + '/../dataMerged'
-  test_folder = '/datafinal_test'
+  test_folder = '/datafinaltest'
   files_zip = get_trajectory_files(path=data_path, folder=test_folder)
 
   for q_line, qd_line, dq_line, dqd_line, trq_line,\
