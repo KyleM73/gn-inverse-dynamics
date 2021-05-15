@@ -6,13 +6,13 @@ import os
 import tensorflow as tf
 import math
 
+from utils.myutils import *
+import utils.mathutils as mathutils
 
-import utils.myutils as myutils
 from graph_nets import utils_tf
 
 from model.readRobot import *
 from model.magnetoDefinition import *
-from utils.myutils import *
 
 
 CURRENT_DIR_PATH = os.path.dirname(os.path.realpath(__file__))
@@ -234,14 +234,16 @@ def get_trajectory_data_test():
 def get_trajectory_data():
   # print("get_trajectory_data")
   #f_q, f_q_d, f_dq, f_dq_d, f_trq, f_base_ori, f_mag_al, f_mag_ar, f_mag_bl, f_mag_br)
-  lop_with_time("get_trajectory_data")
+  log_with_time("get_trajectory_data")
   data_path = CURRENT_DIR_PATH + '/../dataMerged'
   train_folder = '/datafinal'
   files_zip = get_trajectory_files(path=data_path, folder=train_folder)
 
+  # traj_iter = 0
   for q_line, qd_line, dq_line, dqd_line, trq_line,\
       bo_line, fmal_line, fmar_line, fmbl_line, fmbr_line in files_zip:    
-    
+    # traj_iter = traj_iter+1
+    # log_with_time("get_trajectory_data " + str(traj_iter))
     yield traj_data_to_graph(q_line, qd_line, dq_line, dqd_line, trq_line,
                       bo_line, fmal_line, fmar_line, fmbl_line, fmbr_line)
 
@@ -314,12 +316,12 @@ def traj_to_graph(traj_dict):
 
   # dyn_globals
   base_quat = traj_dict['base_ori'] # w,x,y,z
-  base_rz = myutils.quat_to_rot_axis(base_quat,'z')
-  base_rx = myutils.quat_to_rot_axis(base_quat,'x')
+  base_rz = mathutils.quat_to_rot_axis(base_quat,'z')
+  base_rx = mathutils.quat_to_rot_axis(base_quat,'x')
   base_rx_zero = np.cross(base_rz, [0.,1.,0.])
-  base_rx_zero = myutils.normalize(base_rx_zero)
-  delta_theta_rx = myutils.angle_between_axes(base_rx_zero, base_rx)
-  delta_theta_rx = myutils.mod_angle(delta_theta_rx, [-np.pi/2, np.pi/2])
+  base_rx_zero = mathutils.normalize(base_rx_zero)
+  delta_theta_rx = mathutils.angle_between_axes(base_rx_zero, base_rx)
+  delta_theta_rx = mathutils.mod_angle(delta_theta_rx, [-np.pi/2, np.pi/2])
 
   dyn_globals.extend(base_rz)
   dyn_globals.append(delta_theta_rx)

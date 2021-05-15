@@ -7,7 +7,6 @@ import itertools
 import time
 import os 
 
-
 import numpy as np
 import tensorflow as tf
 import sonnet as snt 
@@ -24,6 +23,7 @@ import gn_models as models
 from model.magnetoDefinition import *
 from model.magnetoGraphGeneration import *
 from functions import *
+from utils.myutils import *
 
 CURRENT_DIR_PATH = os.path.dirname(os.path.realpath(__file__))
 #####################################################################################
@@ -34,7 +34,7 @@ num_processing_steps_ge = 3
 
 # Data / training parameters.
 num_training_iterations = 5000000
-batch_size_tr = 256 #256
+batch_size_tr = 1024 #256
 batch_size_ge = 100
 num_time_steps = 50
 step_size = 0.001
@@ -52,6 +52,16 @@ trajDataSet = tf.data.Dataset.from_generator(get_trajectory_data,
                         output_signature = trajDataSet_signature )
 
 dataset = trajDataSet.batch(batch_size_tr, drop_remainder=True)
+
+datasetpath = CURRENT_DIR_PATH + '/dataset'
+log_with_time("1")
+dataset_elementspec = dataset.element_spec
+log_with_time("2")
+dataset = tf.data.experimental.load(datasetpath, element_spec=dataset_elementspec)
+log_with_time("3")
+dataset = dataset.shuffle(buffer_size = 41222)
+log_with_time("3")
+
 for train_traj_tr in dataset :
     inputs_tr = graph_reshape(train_traj_tr[0])
     targets_tr = graph_reshape(train_traj_tr[1])
@@ -66,7 +76,7 @@ traj_signature = (
 print("============ set models =============")
 
 # Optimizer.
-learning_rate = 1e-3
+learning_rate = 1e-4
 optimizer = snt.optimizers.Adam(learning_rate)
 
 model = models.EncodeProcessDecode(edge_output_size=1)

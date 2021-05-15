@@ -1,7 +1,7 @@
 from urdfpy import URDF
 from geometry import axis_angle_from_rotation
 from scipy.spatial.transform import Rotation as R
-from model.mathfunctions import *
+from utils.mathutils import *
 # links, joints, actuated_joints
 
 

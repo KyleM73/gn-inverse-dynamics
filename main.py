@@ -17,10 +17,10 @@ from graph_nets import utils_tf
 import gn_models as models
 
 
-import nn_models as mymodels
 from model.magnetoDefinition import *
 from model.magnetoGraphGeneration import *
 from functions import *
+from utils.myutils import *
 
 CURRENT_DIR_PATH = os.path.dirname(os.path.realpath(__file__))
 ###########################################################
@@ -50,6 +50,8 @@ trajDataSet = tf.data.Dataset.from_generator(get_trajectory_data,
                         output_signature = trajDataSet_signature )
 
 dataset = trajDataSet.batch(batch_size_tr, drop_remainder=True)
+# dataset = dataset.shuffle(buffer_size=4096)
+
 for train_traj_tr in dataset :
     inputs_tr = graph_reshape(train_traj_tr[0])
     targets_tr = graph_reshape(train_traj_tr[1])
@@ -88,7 +90,6 @@ def update_step(inputs_tr, targets_tr):
   return output_ops_tr, loss_tr
 
 
-
 # Compile the update function using the input signature for speedy code.
 compiled_update_step = tf.function(update_step, input_signature=traj_signature)
 
@@ -121,10 +122,13 @@ for iteration in range(0, num_training_iterations):
   batch_iter = 0
   batch_loss_sum = 0.
   for train_traj_tr in dataset :
+    log_with_time("one batch training start")
     inputs_tr = graph_reshape(train_traj_tr[0])
     targets_tr = graph_reshape(train_traj_tr[1])
+    log_with_time("one batch training reshape")
     outputs_tr, loss_tr = compiled_update_step(inputs_tr, targets_tr)
     batch_loss_sum = batch_loss_sum + loss_tr
+    log_with_time("one batch training end")
     # outputs_tr, loss_tr = update_step(inputs_tr, targets_tr)
     
 
@@ -140,6 +144,7 @@ for iteration in range(0, num_training_iterations):
     losses_tr.append(batch_loss_sum)
     print(" T {:.1f}, Ltr {:.4f}".format(elapsed, batch_loss_sum) )
 
+    '''
     if(min_loss[-1] >  batch_loss_sum):
       min_loss.append(batch_loss_sum)
       to_save = snt.Module()
@@ -157,3 +162,4 @@ for iteration in range(0, num_training_iterations):
       print("diff = ")
       print(outputs_tr[-1].edges- targets_tr.edges)
       print(" ================================================ " )
+    '''
